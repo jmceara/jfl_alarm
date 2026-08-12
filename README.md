@@ -5,10 +5,9 @@
 A Home Assistant integration for **JFL Active** alarm panels, speaking the panel's own TCP
 push protocol. Domain: `jfl_alarm`.
 
-> **Status: feature-complete for everyday use, not yet released.** Partitions, the electric fence,
+> **Status: released and in everyday use.** Partitions, the electric fence,
 > PGM outputs and zone bypass all work; so do per-zone wireless health and the action layer. Reading
-> and writing the panel's full programming is still to come. See [ROADMAP.md](ROADMAP.md) for what is
-> next and [PROJECT-STATE.md](PROJECT-STATE.md) for exactly where it stands.
+> and writing the panel's full programming is still to come. Issues and pull requests are welcome.
 
 ## What it does
 
@@ -61,7 +60,7 @@ The panel becomes one device, with a sub-device for each partition and one for t
 — its armed states are *away*, *home*, *night* and *vacation* — so an armed fence
 had to be shown as "Armed away", which an energiser cannot mean. A switch says on or off, and the
 state sensor says the rest in the panel's own words. See
-[ADR-0002](docs/adr/0002-electric-fence-is-a-switch.md).
+ADR-0002.
 
 A cut or broken wire keeps the panel in alarm and **never restores itself**, so the alarm sensor
 stays on until somebody clears the fault at the panel.
@@ -74,7 +73,7 @@ independent alarm you arm and disarm on its own, which is exactly how a panel sp
 partition, like the author's, shows one; enable more in the panel and more appear on the next status
 frame, with no reconfiguration. A zone belongs to a partition in the panel's own programming; reading
 that assignment back into Home Assistant is a later sprint, and needs a capture from a multi-partition
-panel to decode (see the project's backlog).
+panel to decode (not yet supported).
 
 **The panel's arm modes are on that one entity.** The mapping is not the obvious one, because
 JFL's "AWAY" is not Home Assistant's:
@@ -126,13 +125,13 @@ panel — you do not have to tell it anything:
 > switch for it could never be operated (`P-PGM` allows only functions 12 and 13), would read `off`
 > for ever between pulses, and could only ever flip the energiser behind the fence entity's back.
 > The output is still fully described in the diagnostics download, with its function and duration.
-> [ADR-0017](docs/adr/0017-a-pgm-switch-waits-for-its-function.md).
+> ADR-0017.
 >
 > **You never have to identify it.** The programming read that happens on its own when a panel
 > connects detects the energiser's output — function 18, or 25 on an Active 20. The **PGM that powers
 > the electric fence** setting is only an *override*, for when you know something the programming
 > does not; if the two disagree, your setting stands and the clash is raised as a repair.
-> [ADR-0011](docs/adr/0011-the-fence-pgm-is-detected.md).
+> ADR-0011.
 >
 > **The PGM switches therefore appear about half a minute after the rest**, once that read finishes.
 > Everything you watch in an emergency — zones, partitions, the fence — is there from the first
@@ -154,7 +153,7 @@ moved device, it was not re-created.)
 The panel has no "bypass one zone" command: it has "these are the inhibited zones now". So changing
 one zone reads the current list back from the panel first and re-sends it with the one change, which
 is why inhibiting the garage never releases the zone somebody inhibited at the keypad five minutes
-ago. [ADR-0006](docs/adr/0006-bypass-uses-the-bitmap-command.md).
+ago. ADR-0006.
 
 Note that a zone the panel auto-bypassed — because you armed with it open — reads as *not* bypassed
 here. That is the panel's own behaviour: an auto-bypass is not in the manual list, and it clears
@@ -199,7 +198,7 @@ things and folding them together would make "open" mean "the battery died".
 a sensor with a dying battery reports "low battery" while closed and "open" the moment somebody walks
 past it — the battery is still low, the panel just has nowhere to say so. Contact ID events
 `1384`/`3384`, `1383`/`3383` and `1381`/`3381` bracket each condition independently and are latched,
-so a low battery survives the door opening. [ADR-0008](docs/adr/0008-zone-alerts-merge-two-sources.md).
+so a low battery survives the door opening. ADR-0008.
 
 ### Real names, from the panel
 
@@ -210,8 +209,8 @@ the detector.
 
 It is a button rather than something automatic, deliberately: a full read is thirty-odd round trips,
 and a panel that does not answer `0x44` would be asked thirty times on every reconnection. Doing it
-on connect needs a probe first — [ADR-0010](docs/adr/0010-programming-read-is-explicit.md), and it
-is on the backlog.
+on connect needs a probe first — ADR-0010, and it
+is planned.
 
 **Nothing here can write.** Sprint 6 reads; `0x45`, the write command, is in no path an entity or a
 service can reach. And **no user access code ever leaves the parser** — it reports whether one is
@@ -306,51 +305,18 @@ If nothing appears after fifteen minutes, the integration raises a repair notice
 
 ## Installation
 
-Not yet released. When it is, it will install through HACS as a custom repository.
+Install through [HACS](https://hacs.xyz) as a custom repository:
 
-**It is also being prepared for the official Home Assistant catalogue**, which is a higher bar than
-HACS: core requires that all device communication live in an independently published PyPI package.
-That package is `pyjfl`, generated from this repository's `protocol/` and `server.py` — prepared and
-not yet published, because pointing the manifest at a package that does not exist would fail setup
-on a listener that is monitoring a real house. See
-[ADR-0019](docs/adr/0019-pyjfl-owns-the-codec-and-the-transport.md), and, for contributors, how a
-release reaches HACS, PyPI and a `home-assistant/core` submission:
-[docs/development/publishing.md](docs/development/publishing.md) ·
-[publishing-pyjfl.md](docs/development/publishing-pyjfl.md).
+1. HACS → ⋮ → **Custom repositories**
+2. Repository: `https://github.com/jmceara/jfl_alarm` — category: **Integration**
+3. Install **JFL Alarm**, restart Home Assistant, then add it from
+   **Settings → Devices & Services → Add Integration**.
 
-## Documentation
+The panel dials *out*, so nothing needs to be reachable from the internet: program the panel's
+reporting destination with this machine's LAN address and the port you choose (9494 by default).
 
-| | |
-|---|---|
-| End-user manual | [docs/manual/en.md](docs/manual/en.md) · [pt-BR](docs/manual/pt-BR.md) |
-| Wiring and programming the electric fence | [docs/manual/electric-fence-en.md](docs/manual/electric-fence-en.md) · [pt-BR](docs/manual/electric-fence-pt-BR.md) |
-| What is next | [ROADMAP.md](ROADMAP.md) · [BACKLOG.md](BACKLOG.md) |
-| Why things are the way they are | [docs/adr/](docs/adr/) — architecture decision records |
-| Protocol reference | [docs/protocol/](docs/protocol/) — verified facts, byte by byte |
-| Development | [docs/development/](docs/development/) — tools, lab, entity map, capture runbook |
-| Rules for contributors | [AGENTS.md](AGENTS.md) |
-| Where the project stands | [PROJECT-STATE.md](PROJECT-STATE.md) |
-
-## Development
-
-```console
-pip install -r requirements_test.txt
-ruff check . && ruff format --check .
-mypy
-pytest
-```
-
-The `protocol/` package is pure standard library — no Home Assistant, no sockets — so it runs
-anywhere. Tests that need a `hass` fixture require Linux: `pytest-homeassistant-custom-component`
-imports `fcntl` and **does not work on Windows**. Use WSL2, a container, or CI.
-
-`scripts/jfl_replay.py` simulates panels of any model, so the whole integration can be developed and
-demonstrated without owning the hardware:
-
-```console
-python scripts/jfl_replay.py --dump | python scripts/jfl_decode.py
-python scripts/jfl_replay.py --connect 192.168.22.60:9494 --panels A0,A4,A2
-```
+All frame handling lives in [`pyjfl`](https://pypi.org/project/pyjfl/), an independent package
+Home Assistant installs automatically.
 
 ## Credits
 
@@ -359,7 +325,7 @@ python scripts/jfl_replay.py --connect 192.168.22.60:9494 --panels A0,A4,A2
 **Based on** the work of **Carlos Jose Fernandes**, <https://github.com/fernac03/JFL_ACTIVE>. This
 is a new implementation, but it stands on that one: the original is the record of what actually
 operates a live JFL panel, and its packet offsets, model table and command frames informed this
-work. See [AUTHORS.md](AUTHORS.md).
+work. See AUTHORS.md.
 
 The protocol is implemented from JFL's own published specifications and from observing JFL's
 official ActiveNet software communicating with a panel.

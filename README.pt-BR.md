@@ -7,8 +7,7 @@ própria central. Domínio: `jfl_alarm`.
 
 > **Situação: completa para o uso do dia a dia, ainda sem release.** Partições, cerca elétrica,
 > saídas PGM e anulação de zonas funcionam; a saúde por zona e a camada de ações também. Ler e gravar
-> toda a programação da central ainda está por vir. Veja o [ROADMAP.md](ROADMAP.md) para o que vem a
-> seguir e o [PROJECT-STATE.md](PROJECT-STATE.md) para o ponto exato em que o projeto está.
+> toda a programação da central ainda está por vir. Issues e pull requests são bem-vindos.
 
 ## O que ela faz
 
@@ -62,7 +61,7 @@ A central vira um dispositivo, com um subdispositivo para cada partição e um p
 puro — os estados armados dele são *ausente*, *em casa*, *noite* e *férias* —
 então uma cerca armada aparecia como "Armado ausente", que é algo que um eletrificador não tem como
 significar. Um interruptor diz ligado ou desligado, e o sensor de estado diz o resto com as palavras
-da própria central. Veja a [ADR-0002](docs/adr/0002-electric-fence-is-a-switch.md).
+da própria central. Veja a ADR-0002.
 
 Um fio cortado ou rompido mantém a central em disparo e **nunca se restaura sozinho**, então o sensor
 de disparo continua ligado até alguém resolver o problema na central.
@@ -75,8 +74,7 @@ central dividida em várias áreas ("casas") deve funcionar. Quantas aparecem é
 uma central usando uma única partição, como a do autor, mostra uma; habilite mais na central e mais
 aparecem no próximo status, sem reconfigurar nada. A qual partição uma zona pertence fica na
 programação da própria central; trazer esse vínculo para o Home Assistant é uma sprint futura, e
-precisa de uma captura de uma central com múltiplas partições para decodificar (veja o backlog do
-projeto).
+precisa de uma captura de uma central com múltiplas partições para decodificar (ainda não suportado).
 
 **Os modos de armar da central ficam nessa mesma entidade.** O mapeamento não é o óbvio, porque
 o "AWAY" da JFL não é o "away" do Home Assistant:
@@ -131,13 +129,13 @@ central — você não precisa informar nada:
 > leria `off` para sempre entre os pulsos, e a única coisa que poderia fazer seria alternar o
 > eletrificador por trás da entidade da cerca. A saída continua inteiramente descrita no download de
 > diagnósticos, com função e duração.
-> [ADR-0017](docs/adr/0017-a-pgm-switch-waits-for-its-function.md).
+> ADR-0017.
 >
 > **Você nunca precisa identificá-la.** A leitura da programação, que acontece sozinha quando a
 > central se conecta, detecta a saída do eletrificador — função 18, ou 25 na Active 20. A
 > configuração **PGM que aciona a cerca elétrica** é apenas uma *sobreposição*, para quando você
 > souber algo que a programação não diz; se os dois divergirem, a sua configuração prevalece e a
-> divergência vira um reparo. [ADR-0011](docs/adr/0011-the-fence-pgm-is-detected.md).
+> divergência vira um reparo. ADR-0011.
 >
 > **Por isso os interruptores das PGMs aparecem cerca de meio minuto depois dos demais**, quando essa
 > leitura termina. Tudo o que se olha numa emergência — zonas, partições, a cerca — continua
@@ -154,7 +152,7 @@ significa zona anulada — fora do alarme.
 A central não tem um comando "anular a zona X": ela tem "estas são as zonas inibidas agora". Por
 isso, mudar uma zona lê a lista atual de volta da central antes e reenvia com aquela única alteração
 — é o que garante que anular a garagem não libere a zona que alguém inibiu no teclado cinco minutos
-atrás. [ADR-0006](docs/adr/0006-bypass-uses-the-bitmap-command.md).
+atrás. ADR-0006.
 
 Repare que uma zona que a central anulou sozinha — porque você armou com ela aberta — aparece aqui
 como **não** anulada. Esse é o comportamento da própria central: a anulação automática não entra na
@@ -201,7 +199,7 @@ valor só, então um sensor com a bateria acabando informa "bateria fraca" enqua
 "aberta" no instante em que alguém passa na frente — a bateria continua fraca, a central é que não tem
 onde dizer. Os eventos Contact ID `1384`/`3384`, `1383`/`3383` e `1381`/`3381` delimitam cada condição
 de forma independente e ficam retidos, então uma bateria fraca sobrevive à porta abrir.
-[ADR-0008](docs/adr/0008-zone-alerts-merge-two-sources.md).
+ADR-0008.
 
 ### Nomes de verdade, vindos da central
 
@@ -212,8 +210,8 @@ ganham o número de série impresso no detector.
 
 É um botão, e não algo automático, de propósito: uma leitura completa são trinta e tantas idas e
 vindas, e uma central que não responde `0x44` seria consultada trinta vezes a cada reconexão. Fazer
-isso na conexão exige antes um *probe* — [ADR-0010](docs/adr/0010-programming-read-is-explicit.md),
-e está no backlog.
+isso na conexão exige antes um *probe* — ADR-0010,
+e está planejado.
 
 **Nada aqui grava.** A Sprint 6 lê; o `0x45`, o comando de gravação, não está em nenhum caminho que
 uma entidade ou um serviço alcance. E **nenhuma senha de usuário sai do parser** — ele informa se
@@ -314,23 +312,11 @@ exigência maior que a do HACS: o core obriga que toda a comunicação com o equ
 pacote independente publicado no PyPI. Esse pacote é o `pyjfl`, gerado a partir do `protocol/` e do
 `server.py` deste repositório — pronto e ainda **não publicado**, porque apontar o manifest para um
 pacote inexistente faria o setup falhar em um listener que monitora uma casa de verdade. Veja o
-[ADR-0019](docs/adr/0019-pyjfl-owns-the-codec-and-the-transport.md). Para contribuidores, como um
+ADR-0019. Para contribuidores, como um
 release chega ao HACS, ao PyPI e a uma submissão ao `home-assistant/core`:
-[docs/development/publishing.md](docs/development/publishing.md) ·
-[publishing-pyjfl.md](docs/development/publishing-pyjfl.md) — em inglês, como o restante da
+docs/development/publishing.md ·
+publishing-pyjfl.md — em inglês, como o restante da
 documentação técnica.
-
-## Documentação
-
-| | |
-|---|---|
-| Manual do usuário | [docs/manual/pt-BR.md](docs/manual/pt-BR.md) · [inglês](docs/manual/en.md) |
-| Ligar e programar a cerca elétrica | [docs/manual/electric-fence-pt-BR.md](docs/manual/electric-fence-pt-BR.md) |
-| O que vem a seguir | [ROADMAP.md](ROADMAP.md) · [BACKLOG.md](BACKLOG.md) |
-| Por que as coisas são como são | [docs/adr/](docs/adr/) — registros de decisão de arquitetura |
-| Referência do protocolo | [docs/protocol/](docs/protocol/) — fatos verificados, byte a byte |
-| Desenvolvimento | [docs/development/](docs/development/) |
-| Regras para quem contribui | [AGENTS.md](AGENTS.md) |
 
 ## Créditos
 
@@ -339,7 +325,7 @@ documentação técnica.
 **Baseado no** trabalho de **Carlos Jose Fernandes**, <https://github.com/fernac03/JFL_ACTIVE>. Esta
 é uma implementação nova, mas apoiada naquela: o original é o registro do que de fato opera uma
 central JFL viva, e os offsets de pacote, a tabela de modelos e os quadros de comando dele
-orientaram este trabalho. Veja o [AUTHORS.md](AUTHORS.md).
+orientaram este trabalho. Veja o AUTHORS.md.
 
 O protocolo foi implementado a partir das especificações publicadas pela própria JFL e da observação
 do software oficial ActiveNet conversando com uma central.
@@ -366,3 +352,18 @@ está. Um detector que some do inventário fica *indisponível*, em vez de mostr
 Oito sensores de diagnóstico, **cada um na sua unidade** — entrada, saída e zona inteligente em
 segundos; porta aberta, falta de AC e falta de linha em minutos. Um tempo que o instalador desligou
 aparece como *desconhecido*, não como `0`.
+
+## Instalação
+
+Instale pelo [HACS](https://hacs.xyz) como repositório personalizado:
+
+1. HACS → ⋮ → **Repositórios personalizados**
+2. Repositório: `https://github.com/jmceara/jfl_alarm` — categoria: **Integration**
+3. Instale **JFL Alarm**, reinicie o Home Assistant e adicione em
+   **Configurações → Dispositivos e Serviços → Adicionar Integração**.
+
+A central **disca para fora**, então nada precisa ser acessível pela internet: programe o destino
+de eventos da central com o endereço LAN desta máquina e a porta escolhida (9494 por padrão).
+
+Todo o tratamento de frames vive em [`pyjfl`](https://pypi.org/project/pyjfl/), um pacote
+independente que o Home Assistant instala sozinho.

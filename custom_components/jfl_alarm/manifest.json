@@ -1,7 +1,7 @@
 {
   "domain": "jfl_alarm",
   "name": "JFL Alarm",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "codeowners": ["@jmceara"],
   "config_flow": true,
   "dependencies": [],
