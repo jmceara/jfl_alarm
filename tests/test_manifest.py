@@ -24,9 +24,7 @@ MANIFEST = json.loads((PACKAGE / "manifest.json").read_text(encoding="utf-8"))
 # library bump is one edit instead of two — `tests/test_library_boundary.py` is what asserts the pin
 # is exact and that something imports it, which is the part that actually matters. Hard-coding the
 # version here only ever produced a second place to forget.
-PYJFL_VERSION = next(
-    r.split("==")[1] for r in MANIFEST["requirements"] if r.startswith("pyjfl==")
-)
+PYJFL_VERSION = next(r.split("==")[1] for r in MANIFEST["requirements"] if r.startswith("pyjfl=="))
 
 
 def test_the_library_imports_without_home_assistant() -> None:

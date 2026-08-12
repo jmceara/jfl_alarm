@@ -29,16 +29,20 @@ jobs:
         run: ruff format --check .
 
   types:
-    name: mypy --strict on protocol/
+    name: mypy --strict
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
-      - run: python -m pip install --upgrade pip && pip install mypy
-      # AGENTS.md §4: the protocol package is pure standard library, so strict mode is enforceable
-      # there without installing Home Assistant. Scope and exclusions live in pyproject.toml.
+          cache: pip
+      # The full test requirements, not just mypy. `files` in pyproject.toml is the integration, and
+      # every module of it imports Home Assistant — without the harness installed, mypy reports 181
+      # `import-not-found` errors that say nothing about this code. It used to be scoped to
+      # `protocol/`, which was pure standard library and needed no dependencies; that package is
+      # `pyjfl` now (ADR-0019) and is type-checked in its own repository.
+      - run: python -m pip install --upgrade pip && pip install -r requirements_test.txt
       - name: mypy
         run: mypy
 
@@ -54,7 +58,12 @@ jobs:
       - run: python -m pip install --upgrade pip && pip install -r requirements_test.txt
       # `pytest tests` is required, not cosmetic: the repository root is itself a Python package
       # (the old jfl_active integration) and must never become pytest's rootdir. See tests/pytest.ini.
-      # Coverage settings come from pyproject.toml, which `coverage` discovers from the working
-      # directory — the repository root — even though pytest's rootdir is tests/.
+      #
+      # **No `--cov-fail-under` here, deliberately.** Coverage is measured over
+      # `custom_components/jfl_alarm`, and the tests that exercise it — `tests/integration/` — are
+      # not part of the published snapshot: they belong to the private repository, where the full
+      # suite runs against a real Home Assistant. Asserting a threshold against a tree that ships
+      # only the repository-hygiene tests measures nothing and fails at 0%. The number that matters
+      # is enforced where the whole suite exists.
       - name: pytest
-        run: pytest tests --cov --cov-report=term-missing --cov-fail-under=90
+        run: pytest tests --cov --cov-report=term-missing
