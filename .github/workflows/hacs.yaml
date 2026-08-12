@@ -1,0 +1,27 @@
+name: Validate with HACS
+
+# Checks the repository against HACS's requirements for an integration: hacs.json, the repository
+# description and topics, and that custom_components/<domain>/manifest.json is well formed.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hacs/action@main
+        with:
+          category: integration
+          # The brands check requires the domain to be registered in home-assistant/brands, which
+          # cannot happen until the integration is published. Drop this ignore at release.
+          ignore: brands

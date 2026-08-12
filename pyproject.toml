@@ -1,0 +1,106 @@
+[project]
+name = "jfl-alarm"
+version = "0.1.0"
+description = "Home Assistant integration for JFL Active alarm panels"
+requires-python = ">=3.14.2"
+authors = [{ name = "Jonis Maurin Ceará", email = "jmceara@gmail.com" }]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+# Home Assistant 2026.8 requires Python >= 3.14.2, so that is the floor for this project too.
+target-version = "py314"
+line-length = 100
+
+# `docs/` is source material — vendor PDFs, decompiled Java, captured frames — and is not ours to
+# style. `.devlab/` holds a Home Assistant config directory and downloaded tooling.
+extend-exclude = ["docs", ".devlab"]
+
+[tool.ruff.lint]
+select = [
+    "F",    # pyflakes
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "SIM",  # flake8-simplify
+    "C4",   # comprehensions
+    "D",    # pydocstyle — AGENTS.md §4 requires a docstring on every module, class and public function
+    "ANN",  # flake8-annotations — AGENTS.md §4 requires full type annotations
+    "RUF",
+    "PTH",
+    "TRY",
+    "LOG",
+    "G",    # logging format — catches logging.warn and f-strings in log calls
+    "T20",  # no stray print() in integration code
+]
+ignore = [
+    "D203",  # incompatible with D211
+    "D213",  # incompatible with D212
+    "TRY003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# The reverse-engineering tools are command-line programs: printing is the point.
+"scripts/*.py" = ["T20"]
+
+# `SwitchEntity.async_turn_on(**kwargs: Any)` is Home Assistant's signature, not ours. Narrowing the
+# annotation would break the override; the alternative is a `noqa` on all four methods.
+"custom_components/jfl_alarm/switch.py" = ["ANN401"]
+
+# Tests are documentation as much as they are code, and two of the strict rules actively make them
+# worse. `ANN001` would have every test annotate the pytest fixtures it receives, which is noise
+# around the thing the test is actually saying. `D401` wants imperative docstrings, but a test's
+# docstring is a *claim* — "the reply must echo the panel's sequence byte" — and rewriting that as
+# an order reads as nonsense. Everything else still applies, including the docstring requirement
+# itself: `D103` is kept off only for the parametrised helpers that have no story of their own.
+"tests/**/*.py" = ["ANN001", "ANN202", "D103", "D401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+# AGENTS.md §4: `mypy --strict` must pass on the **whole integration**, not only on `protocol/`.
+#
+# It was scoped to `protocol/` until 2026-08-10, on the reasoning that strict mode over the Home
+# Assistant surface was a separate decision. It turned out to cost eight errors in four files, all
+# of them real: two implicit re-exports, a `SelectOptionDict` built as a bare dict, a `getattr` that
+# erased `runtime_data`'s type, and two `_attr_options` overrides. Widening it is what
+# `quality_scale.yaml`'s `strict-typing` rule asks for, and Platinum is this integration's target.
+#
+# `explicit_package_bases` + `mypy_path` pin the package base to `custom_components/`. Without them
+# mypy walks outward looking for the `jfl_alarm` package and can pick up files from *outside* this
+# project entirely — while this folder still sits inside the original JFL_ACTIVE checkout, it finds
+# that repository's `__init__.py` and type-checks the old integration. Keep them.
+[tool.mypy]
+python_version = "3.14"
+files = ["custom_components/jfl_alarm"]
+mypy_path = "custom_components"
+explicit_package_bases = true
+namespace_packages = true
+exclude = ['^(?!custom_components/).*']
+strict = true
+warn_unreachable = true
+enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "--strict-markers"
+norecursedirs = ["fixtures", "data"]
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["custom_components/jfl_alarm"]
+
+[tool.coverage.report]
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]

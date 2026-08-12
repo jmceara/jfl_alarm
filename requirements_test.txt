@@ -1,0 +1,8 @@
+# Test and lint dependencies for the jfl_alarm integration.
+#
+# pytest-homeassistant-custom-component pins pytest, pytest-asyncio and the Home Assistant version
+# it was built against, so nothing else here may pin those.
+pytest-homeassistant-custom-component==0.13.*
+
+mypy==1.*
+ruff==0.14.*
