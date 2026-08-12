@@ -203,6 +203,18 @@ PLATINUM = [
 QUALITY_SCALE_RULES = frozenset(BRONZE + SILVER + GOLD + PLATINUM)
 
 
+# `quality_scale.yaml` is a home-assistant/core mechanism, and the `hacs` publish target strips it
+# along with the manifest key (`drop_quality_scale` in scripts/publish.py): declaring a tier in a
+# custom integration makes hassfest validate it against core's checklist and fail on `brands`, a
+# rule that is unsatisfiable outside core. So the file is absent by design in that snapshot, and
+# these two tests skip there rather than fail — they assert something about *this* repository.
+QUALITY_SCALE_PATH = PACKAGE / "quality_scale.yaml"
+needs_quality_scale = pytest.mark.skipif(
+    not QUALITY_SCALE_PATH.is_file(),
+    reason="quality_scale.yaml is stripped from the published HACS snapshot by design",
+)
+
+
 def _quality_scale() -> dict[str, dict[str, str]]:
     """Parse `quality_scale.yaml`.
 
@@ -212,11 +224,12 @@ def _quality_scale() -> dict[str, dict[str, str]]:
     """
     import yaml
 
-    text = (PACKAGE / "quality_scale.yaml").read_text(encoding="utf-8")
+    text = QUALITY_SCALE_PATH.read_text(encoding="utf-8")
     rules: dict[str, dict[str, str]] = yaml.safe_load(text)["rules"]
     return rules
 
 
+@needs_quality_scale
 def test_the_quality_scale_names_every_rule_home_assistant_defines() -> None:
     """A missing rule fails `hassfest`, and a rule that no longer exists fails it too.
 
@@ -234,6 +247,7 @@ def test_the_quality_scale_names_every_rule_home_assistant_defines() -> None:
     )
 
 
+@needs_quality_scale
 def test_every_quality_scale_status_is_one_home_assistant_accepts() -> None:
     """`done`, `todo` or `exempt`, and an `exempt` must say why — that is the whole value of it."""
     for rule, entry in _quality_scale().items():

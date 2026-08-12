@@ -22,7 +22,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.DEFAULT_PYTHON }}
-      - run: python -m pip install --upgrade pip && pip install ruff
+      # The pinned version, not the latest. `requirements_test.txt` holds `ruff==0.14.*`, and
+      # `ruff format` changes its output between minor releases — an unpinned install meant CI
+      # formatted to a newer ruff than any developer had, so `ruff format --check` failed on code
+      # the local formatter considered clean. `ruff check` passed throughout, which made it look
+      # like a formatting bug in the code rather than a version skew.
+      - run: python -m pip install --upgrade pip && pip install -r requirements_test.txt
       - name: ruff check
         run: ruff check .
       - name: ruff format --check
