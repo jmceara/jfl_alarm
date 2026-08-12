@@ -5,10 +5,15 @@
 pytest-homeassistant-custom-component==0.13.*
 
 # The integration's own runtime dependency. Home Assistant installs it from `manifest.json` at
-# setup, but nothing reads that file during a test run — so without this line the suite and
-# `mypy` both fail on `import pyjfl` anywhere CI has not been primed by hand. Deliberately
-# unpinned, unlike the manifest's exact pin: the manifest states what a *user* gets, while the
-# tests should notice if a newer library breaks them before that version is ever pinned.
+# setup, but nothing reads that file during a test run, so without this line the suite and `mypy`
+# both fail on `import pyjfl` anywhere CI has not been primed by hand. Deliberately unpinned,
+# unlike the manifest's exact pin: the manifest states what a *user* gets, while the tests should
+# notice if a newer library breaks them before that version is ever pinned.
+#
+# ASCII only in this file, deliberately. pip decodes a requirements file using the locale's
+# preferred encoding, not UTF-8, so a stray em-dash in a comment is a UnicodeDecodeError on a
+# runner with a C locale - pip exits 2 before installing anything, and the failure names the file
+# rather than the character.
 pyjfl
 
 mypy==1.*

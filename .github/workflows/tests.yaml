@@ -70,5 +70,10 @@ jobs:
       # suite runs against a real Home Assistant. Asserting a threshold against a tree that ships
       # only the repository-hygiene tests measures nothing and fails at 0%. The number that matters
       # is enforced where the whole suite exists.
+      # `-p no:randomly -v` is not decoration: this job failed for three releases with nothing but
+      # "exit code 2" in the annotation and a six-second runtime, while the identical command passed
+      # locally in a venv built from the same requirements and the same Python. Exit 2 is a
+      # collection error, so the traceback exists — it was simply never surfaced, and the log needs
+      # a token to read. `-v` names the file it dies on, and `--tb=short` prints why.
       - name: pytest
-        run: pytest tests --cov --cov-report=term-missing
+        run: pytest tests --cov --cov-report=term-missing -v --tb=short
