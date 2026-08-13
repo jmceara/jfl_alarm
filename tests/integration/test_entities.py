@@ -459,8 +459,12 @@ async def test_an_event_fires_on_the_panel_and_its_partition(
     assert panel_event.attributes["description"]
     assert panel_event.attributes["subject"] == "009"
 
-    # Partition 2 heard it; partition 1 did not.
-    assert hass.states.get("event.partition_2_events").state == panel_event.state
+    # Partition 2 heard it; partition 1 did not. Compared by the event's own content, not the
+    # entity's `state` timestamp: each entity schedules its own state write off the same
+    # dispatcher signal, so their timestamps can differ by a millisecond even though it is the
+    # same event — comparing them for equality is the same flake `wait_until` above works around.
+    partition_2_event = hass.states.get("event.partition_2_events")
+    assert partition_2_event.attributes["code"] == panel_event.attributes["code"]
     assert hass.states.get("event.partition_1_events").state == "unknown"
 
 
