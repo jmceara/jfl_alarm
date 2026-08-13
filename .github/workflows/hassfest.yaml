@@ -1,0 +1,25 @@
+name: Validate with hassfest
+
+# hassfest is Home Assistant's own manifest validator. It checks manifest.json's keys and values,
+# the translation files, services.yaml and the brands registry. It scans custom_components/*/ , so
+# it validates jfl_alarm and ignores the old jfl_active integration at the repository root.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Home Assistant tightens manifest requirements between releases; a weekly run catches a break
+    # without waiting for the next commit.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master

@@ -1,0 +1,20 @@
+{
+  "domain": "jfl_alarm",
+  "name": "JFL Alarm",
+  "codeowners": [
+    "@jmceara"
+  ],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/jmceara/jfl_alarm",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/jmceara/jfl_alarm/issues",
+  "loggers": [
+    "pyjfl"
+  ],
+  "requirements": [
+    "pyjfl==0.2.0"
+  ],
+  "version": "0.1.12"
+}
