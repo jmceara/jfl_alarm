@@ -1,0 +1,87 @@
+# Structure only. Every name and description lives in `translations/*.json` — AGENTS.md §1.
+
+sync_time:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jfl_alarm
+
+refresh_status:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jfl_alarm
+
+set_bypass_mask:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jfl_alarm
+    zones:
+      required: true
+      example: "[9, 10]"
+      selector:
+        object:
+
+send_raw_command:
+  # The reverse-engineering tool. Hidden from the ordinary service list on purpose.
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jfl_alarm
+    command:
+      required: true
+      example: 77
+      selector:
+        number:
+          min: 0
+          max: 255
+          mode: box
+    payload:
+      required: false
+      example: "63"
+      selector:
+        text:
+
+read_programming:
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jfl_alarm
+
+read_event_buffer:
+  # The panel's own history. A read, so it works in read-only mode.
+  fields:
+    device_id:
+      required: true
+      selector:
+        device:
+          integration: jfl_alarm
+    since_serial:
+      required: false
+      example: 13570
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 4294967295
+          mode: box
+    limit:
+      required: false
+      example: 200
+      default: 200
+      selector:
+        number:
+          min: 1
+          max: 2000
+          mode: box
