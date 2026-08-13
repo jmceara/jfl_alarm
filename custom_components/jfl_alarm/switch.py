@@ -50,8 +50,8 @@ output keeps ADR-0007's original treatment — a switch on the panel, configurat
 because there the entity is the only trace of a contradiction worth seeing.
 
 The user's `fence_pgm` setting is an **override** rather than the only source: detection finds
-function 18 on its own (`protocol/capabilities.py`, ADR-0011), and a setting that disagrees still
-wins and raises `fence_pgm_conflict`.
+function 18 on its own (pyjfl's `protocol/capabilities.py`, ADR-0011), and a setting that
+disagrees still wins and raises `fence_pgm_conflict`.
 
 Zone bypass is a `switch` per zone the panel says may be inhibited. It is `EntityCategory.CONFIG`
 because inhibiting a zone is not something to leave a button for on a wall dashboard.

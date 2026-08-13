@@ -167,7 +167,7 @@ optional.** A programming read detects the fence's PGM on its own — function 1
 correctly without anyone being asked to do anything. A value set here still wins over detection,
 because the user may know something the programming does not — a relay wired downstream of an output
 whose function reads as something else. When the two disagree the setting is honoured and the
-disagreement is raised as a repair. See ADR-0011, ADR-0017 and `protocol/capabilities.py`.
+disagreement is raised as a repair. See ADR-0011, ADR-0017 and pyjfl's `protocol/capabilities.py`.
 """
 
 DEFAULT_FENCE_PGM: Final = 0
