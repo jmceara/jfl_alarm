@@ -23,6 +23,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.jfl_alarm.const import CONF_READ_ONLY, DOMAIN
+from custom_components.jfl_alarm.device import get_sub_device
 from tests.integration.conftest import make_entry
 from tests.panel_sim import FakePanel
 
@@ -154,8 +155,7 @@ async def test_zones_and_partitions_take_the_panels_own_names(
         _, coordinator = await _bring_up(hass, entry, connect_panel, panel)
         await coordinator.async_read_programming()
 
-        devices = dr.async_get(hass)
-        zone = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone1")})
+        zone = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone1"))
         assert zone.name == "Zone 1 P Frente"
 
         # **The name has to come from a translation key, not an f-string.** Composing it literally
@@ -164,7 +164,7 @@ async def test_zones_and_partitions_take_the_panels_own_names(
         # cannot see — that `zone_named` exists in *both* languages with both placeholders — is
         # asserted in `tests/test_translations.py`.
 
-        partition = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-partition1")})
+        partition = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-partition1"))
         assert partition.name == "Interno"
     finally:
         await hass.config_entries.async_unload(entry.entry_id)
@@ -184,11 +184,10 @@ async def test_a_zone_with_no_programmed_name_stays_a_bare_number(
         _, coordinator = await _bring_up(hass, entry, connect_panel, panel)
         await coordinator.async_read_programming()
 
-        devices = dr.async_get(hass)
-        unnamed = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone2")})
+        unnamed = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone2"))
         assert unnamed.name == "Zone 2", "the plain numbered key, still translatable"
 
-        named = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone1")})
+        named = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone1"))
         assert named.name == "Zone 1 Cozinha"
     finally:
         await hass.config_entries.async_unload(entry.entry_id)
@@ -233,14 +232,21 @@ async def test_a_wireless_zone_gains_its_serial(
         _, coordinator = await _bring_up(hass, entry, connect_panel, panel)
         await coordinator.async_read_programming()
 
-        devices = dr.async_get(hass)
-        radio = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone9")})
-        assert radio.serial_number == f"{0xB205AF2A:010d}"
+        from custom_components.jfl_alarm.device import _HAS_CHILD_DEVICE_INFO
 
-        # A hard-wired zone gains nothing, and that is correct rather than a gap: the panel does
-        # not know what is wired to it.
-        wired = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone1")})
-        assert wired.serial_number is None
+        radio = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone9"))
+        wired = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone1"))
+        if _HAS_CHILD_DEVICE_INFO:
+            # Child devices carry no `serial_number` field at all; the radio's serial moved to
+            # `sensor.py`'s `extra_state_attributes` instead — asserted elsewhere for this HA
+            # version.
+            pass
+        else:
+            assert radio.serial_number == f"{0xB205AF2A:010d}"
+
+            # A hard-wired zone gains nothing, and that is correct rather than a gap: the panel does
+            # not know what is wired to it.
+            assert wired.serial_number is None
 
         assert coordinator.programming.wireless_for_zone(9) is not None
         assert coordinator.programming.wireless_for_zone(1) is None
@@ -260,7 +266,9 @@ async def test_the_service_response_can_never_carry_an_access_code(
     entry = await _entry_for(hass, port, panel)
     try:
         await _bring_up(hass, entry, connect_panel, panel)
-        device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, panel.serial)})
+        device = dr.async_get(hass).async_get_device_by_identifier(
+            (DOMAIN, panel.serial), config_entry_id=entry.entry_id
+        )
 
         response = await hass.services.async_call(
             DOMAIN,
@@ -320,7 +328,7 @@ async def test_a_programmed_name_survives_a_later_entity_registration(
         await coordinator.async_read_programming()
 
         devices = dr.async_get(hass)
-        named = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone9")})
+        named = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone9"))
         assert named.name_by_user is None
         before = named.name
 
@@ -330,14 +338,24 @@ async def test_a_programmed_name_survives_a_later_entity_registration(
         entity = JflZoneSensor(coordinator, 9)
         device_info = entity.device_info
         assert device_info is not None
-        devices.async_get_or_create(
-            config_entry_id=entry.entry_id,
-            config_subentry_id=coordinator.subentry.subentry_id,
-            **device_info,
-        )
+        # Mirrors the dispatch `entity_platform.py` itself makes when a real entity registers: a
+        # `parent_device_id` means a child device (2026.9+), and `async_get_or_create` is
+        # main-device only from that version on.
+        if device_info.get("parent_device_id") is not None:
+            devices.async_get_or_create_child(  # type: ignore[attr-defined]
+                config_entry_id=entry.entry_id,
+                config_subentry_id=coordinator.subentry.subentry_id,
+                **device_info,
+            )
+        else:
+            devices.async_get_or_create(
+                config_entry_id=entry.entry_id,
+                config_subentry_id=coordinator.subentry.subentry_id,
+                **device_info,
+            )
         await hass.async_block_till_done()
 
-        after = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone9")})
+        after = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone9"))
         assert after.name == before, "a later registration must not strip the programmed name"
     finally:
         await hass.config_entries.async_unload(entry.entry_id)

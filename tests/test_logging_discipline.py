@@ -30,9 +30,12 @@ ALLOWED_LOUD_CALLS: dict[str, set[str]] = {
     # once per panel per Home Assistant restart, and it is the answer to "where did that device
     # come from?" — exactly what AGENTS.md §4 reserves `info` for.
     "__init__": {"info"},
-    # `warning` once when a panel stops reporting, `info` once when it comes back. Guarded by a
-    # flag so a panel that redials every ninety seconds still produces one line per transition and
-    # not one per attempt; `test_availability_is_logged_once_per_transition` enforces that.
+    # `info` once when a panel stops reporting, `info` once when it comes back — both directions,
+    # matching the quality-scale `log-when-unavailable` rule exactly. Guarded by a flag so a panel
+    # that redials every ninety seconds still produces one line per transition and not one per
+    # attempt; `test_availability_is_logged_once_per_transition` enforces that. `warning` is used
+    # elsewhere in this module for a rejected command and the auth-lockout guard, which is why it
+    # stays in this set too.
     "coordinator": {"warning", "info"},
     # `warning` when no panel has connected at all. It accompanies a repair issue, fires at most
     # once per entry setup, and is the single most likely thing a user needs to be told.

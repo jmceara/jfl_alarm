@@ -153,15 +153,17 @@ async def test_availability_is_logged_once_per_transition(
     await first.close()
     await wait_until(hass, lambda: not coordinator.data.available)
 
-    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
-    assert sum("stopped reporting" in record.message for record in warnings) == 1
+    # Both directions log at info — the quality-scale rule `log-when-unavailable` asks for that
+    # level unconditionally, on both the disappearance and the return.
+    infos = [record for record in caplog.records if record.levelname == "INFO"]
+    assert sum("stopped reporting" in record.message for record in infos) == 1
 
     caplog.clear()
     second = await connect_panel(panel)
     await second.introduce(hass)
     await wait_until(hass, lambda: coordinator.data.available)
 
-    # Recovery is one line at info, and the warning is not repeated.
+    # Recovery is one line at info, and it is not repeated.
     assert sum("is reporting again" in record.message for record in caplog.records) == 1
 
 
@@ -308,7 +310,9 @@ async def test_the_device_of_a_removed_panel_can_be_deleted(
     await connection.introduce(hass)
 
     devices = dr.async_get(hass)
-    live = devices.async_get_device(identifiers={(DOMAIN, panel.serial)})
+    live = devices.async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
     assert live is not None
     assert not await async_remove_config_entry_device(hass, setup_entry, live)
 

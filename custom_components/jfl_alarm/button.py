@@ -102,10 +102,11 @@ class JflReadProgrammingButton(JflEntity, ButtonEntity):
     **A read, and only a read.** `0x44` asks; nothing in this integration sends `0x45`, the write.
     So this runs in read-only mode for the same reason the status refresh does.
 
-    It is a button rather than something automatic on connect, and that is a deliberate limit of
-    this sprint: a full read is thirty-odd round trips, and a panel that does not answer `0x44` at
-    all would be asked thirty times on every reconnection. Doing it automatically needs a probe
-    first — one block, and give up quietly if it never comes back.
+    The coordinator already runs this automatically — once when a panel first connects, and again
+    on the configured interval, but only when `KP` (the programming checksum in the status frame)
+    shows something actually changed, and never again at all once a panel has proven it will not
+    answer `0x44`. This button is the on-demand supplement: forcing a read right now, without
+    waiting for the next tick, is useful right after reprogramming the panel from its own keypad.
     """
 
     entity_description = READ_PROGRAMMING

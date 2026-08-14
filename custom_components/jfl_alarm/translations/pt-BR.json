@@ -2,7 +2,6 @@
   "config": {
     "step": {
       "user": {
-        "title": "JFL Alarm",
         "description": "As centrais JFL discam para o Home Assistant, então esta integração fica escutando e esperando. Escolha a porta TCP a escutar; ela precisa ser a mesma programada no destino de eventos da central. Todo o resto — modelo, partições, zonas e a cerca elétrica — é detectado da própria central.",
         "data": {
           "port": "Porta de escuta",
@@ -14,7 +13,6 @@
         }
       },
       "reconfigure": {
-        "title": "Alterar o endereço de escuta",
         "description": "Mudar a porta significa reprogramar a central para acompanhar, senão ela deixa de reportar.",
         "data": {
           "port": "Porta de escuta",
@@ -38,14 +36,12 @@
   },
   "config_subentries": {
     "panel": {
-      "title": "Central",
       "initiate_flow": {
         "user": "Adicionar uma central"
       },
       "entry_type": "Central",
       "step": {
         "user": {
-          "title": "Adicionar uma central JFL",
           "description": "As centrais que já se comunicaram aparecem na lista abaixo e não precisam de mais nada. Adicione manualmente apenas se a central ainda não estiver ligada, ou se o receptor estiver configurado para reter centrais desconhecidas para aprovação.",
           "data": {
             "serial": "Número de série da central",
@@ -67,7 +63,6 @@
           }
         },
         "reconfigure": {
-          "title": "Configurações da central",
           "description": "Configurações da central {serial}. O número de série identifica a central e não pode ser alterado.",
           "data": {
             "read_only": "Modo somente leitura",
@@ -493,6 +488,10 @@
     "fence_pgm_conflict": {
       "title": "A PGM da cerca configurada diverge da central",
       "description": "Você definiu a PGM {configured} como a que aciona a cerca elétrica da central {serial}, mas a própria programação da central diz que quem aciona é a PGM {detected}.\n\nA sua configuração está sendo respeitada — nada foi alterado. Mas uma das duas está errada: ou a programação lê uma função que você não esperava, ou o número nas configurações é um engano. Verifique qual saída realmente aciona o seu eletrificador e ajuste."
+    },
+    "fence_pgm_detected": {
+      "title": "Uma saída PGM aciona a cerca elétrica",
+      "description": "Este aviso foi descontinuado — a integração agora posiciona e marca a chave sozinha, em vez de pedir que você o faça. Mantido aqui apenas para que uma instalação atualizada de uma versão anterior ainda consiga ver e dispensar o aviso que já havia gerado."
     }
   },
   "device": {

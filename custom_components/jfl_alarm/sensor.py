@@ -345,16 +345,26 @@ class JflZoneSignalSensor(_JflWirelessSensor):
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
-        """The repeater the detector arrives through, and its firmware.
+        """The repeater the detector arrives through, its firmware, and its model.
 
-        `repeater` is `0` for a direct link. It is an attribute rather than its own entity because
-        it changes only when somebody moves a detector or a repeater, and it is meaningless without
-        the signal reading it qualifies.
+        `repeater` is `0` for a direct link. All three are attributes rather than their own
+        entities because they change only when somebody moves or swaps a detector, and none of
+        them means anything without the signal reading they qualify. `model` is repeated here
+        even on a Home Assistant version whose zone device page also carries it (`device.py`'s
+        `build_zone_device`, pre-2026.9): on 2026.9+ the device page cannot show it at all, since
+        the child-device mechanism has no `model` field, so this is the one place guaranteed to
+        have it either way.
         """
         device = self.device
         if device is None:
             return None
-        return {"repeater": device.repeater, "firmware": device.firmware, "serial": device.serial}
+        radio = self.coordinator.programming.wireless_for_zone(self.zone)
+        return {
+            "repeater": device.repeater,
+            "firmware": device.firmware,
+            "serial": device.serial,
+            "model": (radio.model or "") if radio is not None else "",
+        }
 
 
 class JflZoneLastSeenSensor(_JflWirelessSensor):

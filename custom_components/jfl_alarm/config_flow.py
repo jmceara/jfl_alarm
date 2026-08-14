@@ -184,7 +184,7 @@ class JflConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+    def async_get_options_flow(config_entry: JflConfigEntry) -> OptionsFlow:
         """Return the hub options flow. **No constructor argument** — AGENTS.md §5."""
         return JflOptionsFlow()
 

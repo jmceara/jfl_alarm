@@ -50,7 +50,7 @@ async def test_send_raw_command_frames_and_returns_the_reply(
             DOMAIN,
             "send_raw_command",
             {
-                "device_id": _panel_device_id(hass, panel.serial),
+                "device_id": _panel_device_id(hass, entry.entry_id, panel.serial),
                 "command": int(Cmd.ARM),
                 "payload": "63",
             },
@@ -79,7 +79,7 @@ async def test_a_bad_raw_payload_is_rejected_before_anything_is_sent(
                 DOMAIN,
                 "send_raw_command",
                 {
-                    "device_id": _panel_device_id(hass, panel.serial),
+                    "device_id": _panel_device_id(hass, entry.entry_id, panel.serial),
                     "command": 0x4D,
                     "payload": "not hex",
                 },
@@ -104,7 +104,7 @@ async def test_an_empty_payload_sends_a_bare_command(
             DOMAIN,
             "send_raw_command",
             {
-                "device_id": _panel_device_id(hass, panel.serial),
+                "device_id": _panel_device_id(hass, entry.entry_id, panel.serial),
                 "command": int(Cmd.ARM),
                 "payload": "   ",
             },
@@ -134,7 +134,7 @@ async def test_a_non_admin_user_is_refused_before_anything_is_sent(
                 DOMAIN,
                 "send_raw_command",
                 {
-                    "device_id": _panel_device_id(hass, panel.serial),
+                    "device_id": _panel_device_id(hass, entry.entry_id, panel.serial),
                     "command": int(Cmd.ARM),
                     "payload": "63",
                 },
@@ -161,7 +161,7 @@ async def test_an_unknown_user_id_is_also_refused(
                 DOMAIN,
                 "send_raw_command",
                 {
-                    "device_id": _panel_device_id(hass, panel.serial),
+                    "device_id": _panel_device_id(hass, entry.entry_id, panel.serial),
                     "command": int(Cmd.ARM),
                     "payload": "63",
                 },

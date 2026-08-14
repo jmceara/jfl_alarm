@@ -48,6 +48,7 @@ from homeassistant.util import dt as dt_util
 from pyjfl import (
     EVENTS_PER_PAGE,
     UNKNOWN_MODEL,
+    WIRELESS_PER_PAGE,
     ArmMode,
     CommandResponse,
     ConnectionInfo,
@@ -101,7 +102,12 @@ from pyjfl import (
     plan_region,
     zone_alert,
 )
-from pyjfl.protocol.models import WIRELESS_PER_PAGE
+
+# `MAX_WIRELESS` and `REGIONS` are not re-exported from `pyjfl`'s top-level namespace (unlike
+# `WIRELESS_PER_PAGE` above, which is and is imported from there). Reaching into
+# `pyjfl.protocol.programming` for these two is a boundary compromise, tracked as a `pyjfl` library
+# gap rather than fixed here — narrowing this import needs a release of `pyjfl` that exports them
+# at the top level, which is out of this repository's control. See BACKLOG.md.
 from pyjfl.protocol.programming import MAX_WIRELESS, REGIONS
 
 from .const import (
@@ -1232,12 +1238,18 @@ class JflPanelCoordinator(DataUpdateCoordinator[JflPanelState]):
 
         Logged **once** per transition, never per retry: a panel that redials every ninety seconds
         would otherwise fill the log with a pair of lines a minute. AGENTS.md §4.
+
+        Both directions are `info`, matching the quality-scale `log-when-unavailable` rule exactly:
+        it asks for `info` on both the disappearance and the return, on the grounds that this is
+        about being able to find out *when* and *why*, not about severity. A panel that goes quiet
+        is not the integration failing — the repair issue and the connectivity sensor are where
+        anything more urgent than "here is what happened" belongs.
         """
         if available and self._warned_unavailable:
             LOGGER.info("Panel %s is reporting again", self.serial)
             self._warned_unavailable = False
         elif not available and not self._warned_unavailable:
-            LOGGER.warning(
+            LOGGER.info(
                 "Panel %s stopped reporting. Check that it is powered, on the network, and still "
                 "programmed to report to this integration",
                 self.serial,

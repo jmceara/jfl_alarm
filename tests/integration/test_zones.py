@@ -19,12 +19,14 @@ and proves the entity is adopted rather than replaced.
 
 from __future__ import annotations
 
+import pytest
 from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.jfl_alarm.const import DOMAIN
+from custom_components.jfl_alarm.device import _HAS_CHILD_DEVICE_INFO, get_sub_device
 from tests.integration.conftest import make_entry, wait_until
 from tests.panel_sim import FakePanel
 
@@ -48,13 +50,23 @@ async def test_each_zone_becomes_its_own_device_under_the_panel(
     await _bring_up(hass, setup_entry, connect_panel, panel)
 
     devices = dr.async_get(hass)
-    zone = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone1")})
+    zone = get_sub_device(hass, setup_entry.entry_id, (DOMAIN, f"{panel.serial}-zone1"))
     assert zone is not None
-    assert zone.via_device_id == devices.async_get_device(identifiers={(DOMAIN, panel.serial)}).id
+    panel_device = devices.async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
+    linked_to = getattr(zone, "parent_device_id", None) or zone.via_device_id
+    assert linked_to == panel_device.id
 
     # No invented model or manufacturer: the panel reports the *state* of a zone, never what is
-    # wired to it. A reed switch and an IRD-650 are the same nibble.
-    assert zone.model is None
+    # wired to it. A reed switch and an IRD-650 are the same nibble. On 2026.9+ a child device has
+    # no `model` field at all — `ChildDeviceEntry.model` raises rather than returning `None` from
+    # this test's own frame — so the raise is itself the guarantee on that path.
+    if _HAS_CHILD_DEVICE_INFO:
+        with pytest.raises(AttributeError):
+            _ = zone.model
+    else:
+        assert zone.model is None
 
     entities = er.async_get(hass)
     on_this_zone = {
@@ -117,7 +129,7 @@ async def test_zone_entities_survive_the_move_to_their_own_device(
         assert migrated.name == "Front door", "the user's rename survives"
 
         # It now lives on the zone's own device.
-        zone_device = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-zone1")})
+        zone_device = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-zone1"))
         assert zone_device is not None
         assert migrated.device_id == zone_device.id
 

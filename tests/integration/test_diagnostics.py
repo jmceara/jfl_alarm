@@ -24,6 +24,7 @@ from pytest_homeassistant_custom_component.components.diagnostics import (
 from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.jfl_alarm.const import DOMAIN
+from custom_components.jfl_alarm.device import get_sub_device
 from tests.panel_sim import FakePanel
 
 
@@ -112,14 +113,16 @@ async def test_the_same_panel_gets_the_same_token_everywhere(
     await connection.introduce(hass)
 
     entry_dump = await get_diagnostics_for_config_entry(hass, hass_client, setup_entry)
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, panel.serial)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
     panel_dump = await get_diagnostics_for_device(hass, hass_client, setup_entry, device)
 
     assert entry_dump["panels"][0]["serial"] == panel_dump["serial"]
     assert not panel_dump["serial"].endswith(panel.serial)
 
     # A sub-device resolves to its parent panel rather than dumping nothing useful.
-    fence = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, f"{panel.serial}-fence")})
+    fence = get_sub_device(hass, setup_entry.entry_id, (DOMAIN, f"{panel.serial}-fence"))
     if fence is not None:
         fence_dump = await get_diagnostics_for_device(hass, hass_client, setup_entry, fence)
         assert fence_dump["serial"] == panel_dump["serial"]

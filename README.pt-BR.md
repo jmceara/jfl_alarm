@@ -305,15 +305,17 @@ Se nada aparecer em quinze minutos, a integração abre um aviso de reparo com e
 verificação — uma integração à qual a central precisa se conectar falha em silêncio por natureza, e
 esse aviso é a solução.
 
-Ainda não há release. Quando houver, a instalação será pelo HACS como repositório personalizado.
+Lançada, e instala pelo [HACS](https://hacs.xyz) como repositório personalizado:
+`https://github.com/jmceara/jfl_alarm`.
 
 **A integração também está sendo preparada para o catálogo oficial do Home Assistant**, que é uma
 exigência maior que a do HACS: o core obriga que toda a comunicação com o equipamento fique em um
-pacote independente publicado no PyPI. Esse pacote é o `pyjfl`, gerado a partir do `protocol/` e do
-`server.py` deste repositório — pronto e ainda **não publicado**, porque apontar o manifest para um
-pacote inexistente faria o setup falhar em um listener que monitora uma casa de verdade. Veja o
-ADR-0019. Para contribuidores, como um
-release chega ao HACS, ao PyPI e a uma submissão ao `home-assistant/core`:
+pacote independente publicado no PyPI. Esse pacote é o `pyjfl`, **publicado no PyPI** e fixado por
+versão exata no `manifest.json` — veja o
+ADR-0019, que registra a extração pela
+qual `protocol/` e `server.py` deste repositório passaram para se tornar esse pacote, concluída em
+2026-08-12. Para contribuidores, como um release chega ao HACS e a uma submissão ao
+`home-assistant/core`:
 docs/development/publishing.md ·
 publishing-pyjfl.md — em inglês, como o restante da
 documentação técnica.

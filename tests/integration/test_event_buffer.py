@@ -205,7 +205,7 @@ async def test_the_service_names_the_subject_and_returns_a_cursor(
         response = await hass.services.async_call(
             DOMAIN,
             "read_event_buffer",
-            {"device_id": _panel_device_id(hass, panel.serial)},
+            {"device_id": _panel_device_id(hass, entry.entry_id, panel.serial)},
             blocking=True,
             return_response=True,
         )
@@ -251,7 +251,7 @@ async def test_an_origin_subject_is_never_looked_up_as_a_person(
         response = await hass.services.async_call(
             DOMAIN,
             "read_event_buffer",
-            {"device_id": _panel_device_id(hass, panel.serial)},
+            {"device_id": _panel_device_id(hass, entry.entry_id, panel.serial)},
             blocking=True,
             return_response=True,
         )
@@ -282,7 +282,7 @@ async def test_a_subjectless_code_gets_no_name_at_all(
         response = await hass.services.async_call(
             DOMAIN,
             "read_event_buffer",
-            {"device_id": _panel_device_id(hass, panel.serial)},
+            {"device_id": _panel_device_id(hass, entry.entry_id, panel.serial)},
             blocking=True,
             return_response=True,
         )
@@ -306,7 +306,7 @@ async def test_a_device_that_resolves_to_no_loaded_panel_fails_loudly(
     """
     panel = FakePanel(serial="EVENTUNLD1")
     entry = await _entry_for(hass, port, panel)
-    device_id = _panel_device_id(hass, panel.serial)
+    device_id = _panel_device_id(hass, entry.entry_id, panel.serial)
 
     await hass.config_entries.async_unload(entry.entry_id)
     await hass.async_block_till_done()
@@ -321,9 +321,11 @@ async def test_a_device_that_resolves_to_no_loaded_panel_fails_loudly(
         )
 
 
-def _panel_device_id(hass: HomeAssistant, serial: str) -> str:
+def _panel_device_id(hass: HomeAssistant, entry_id: str, serial: str) -> str:
     from homeassistant.helpers import device_registry as dr
 
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, serial)})
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, serial), config_entry_id=entry_id
+    )
     assert device is not None
     return device.id

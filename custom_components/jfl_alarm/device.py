@@ -17,7 +17,7 @@ can call it without importing the entity layer, which imports the coordinator.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
@@ -30,6 +30,19 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from pyjfl import ConnectionInfo, WirelessRecord
+
+# `ChildDeviceInfo` and `async_get_device_id_by_identifier` land in Home Assistant 2026.9; `main`
+# already carries them (which is what a core PR is reviewed against), but every released version
+# this integration actually runs on today — 2026.8.1 included — only has `via_device`. Detected
+# once at import time rather than per call, so the two code paths below never disagree mid-run.
+try:
+    from homeassistant.helpers.device_registry import (  # type: ignore[attr-defined]
+        ChildDeviceInfo as _,  # noqa: F401
+    )
+
+    _HAS_CHILD_DEVICE_INFO = True
+except ImportError:  # pragma: no cover — depends on which HA version is installed
+    _HAS_CHILD_DEVICE_INFO = False
 
 
 def panel_device_id(serial: str) -> str:
@@ -99,8 +112,80 @@ def render_firmware(raw: str) -> str:
     return digits
 
 
+def _link_to_panel(hass: HomeAssistant, entry_id: str, serial: str) -> dict[str, Any]:
+    """Return the dict fragment that links a sub-device to its panel, on whichever mechanism fits.
+
+    2026.9 replaces `via_device` with `parent_device_id`, a real device id rather than an
+    identifier pair — see the `_HAS_CHILD_DEVICE_INFO` note above. The panel is registered
+    explicitly in `async_setup_entry`, before any subentry's platforms are forwarded, specifically
+    so the 2026.9 lookup never has to tolerate the panel not existing yet; `via_device` never
+    needed that guarantee, because it re-resolves the pair every time the registry is read.
+    """
+    if _HAS_CHILD_DEVICE_INFO:
+        return {
+            "parent_device_id": dr.async_get_device_id_by_identifier(
+                hass, (DOMAIN, panel_device_id(serial)), config_entry_id=entry_id
+            )
+        }
+    return {"via_device": (DOMAIN, panel_device_id(serial))}
+
+
+def get_sub_device(
+    hass: HomeAssistant, entry_id: str, identifier: tuple[str, str]
+) -> object | None:
+    """Return the sub-device registered under *identifier*, or `None`.
+
+    On 2026.9+, a partition/zone/fence device is a *child* device, and `DeviceRegistry.
+    async_get_device` — the lookup that worked before — is deprecated for exactly that reason: it
+    only searches main devices, so it always returns `None` for one of these. Exported (not
+    prefixed `_`) so tests asserting on a sub-device's registry entry share this same
+    version-aware lookup rather than each re-implementing the branch.
+    """
+    registry = dr.async_get(hass)
+    if _HAS_CHILD_DEVICE_INFO:
+        return registry.async_get_child_device_by_identifier(  # type: ignore[attr-defined,no-any-return]
+            identifier, entry_id
+        )
+    return registry.async_get_device(identifiers={identifier})
+
+
+def _sub_device_exists(hass: HomeAssistant, entry_id: str, identifier: tuple[str, str]) -> bool:
+    """Whether the sub-device registered under *identifier* already exists.
+
+    `async_apply_programmed_names` uses this rather than `get_sub_device` directly only because a
+    bare boolean is what it needs; the deprecation this works around is documented there.
+    """
+    return get_sub_device(hass, entry_id, identifier) is not None
+
+
+def _register_sub_device(
+    hass: HomeAssistant, *, entry_id: str, subentry_id: str, device: dict[str, Any]
+) -> None:
+    """Write *device* (a partition/zone/fence built by one of the `build_*_device` helpers).
+
+    `DeviceRegistry.async_get_or_create` is main-device-only from 2026.9 on — it raises on a dict
+    carrying `parent_device_id`, which every sub-device built with `_link_to_panel` does on that
+    version. `entity_platform.py` makes the same `parent_device_id is not None` check before
+    picking `async_get_or_create_child` for a plain entity's `device_info`; this mirrors it for the
+    registry writes `async_apply_programmed_names` makes directly, outside that entity path.
+    """
+    registry = dr.async_get(hass)
+    if device.get("parent_device_id") is not None:
+        registry.async_get_or_create_child(  # type: ignore[attr-defined]
+            config_entry_id=entry_id,
+            config_subentry_id=subentry_id,
+            **device,
+        )
+    else:
+        registry.async_get_or_create(
+            config_entry_id=entry_id, config_subentry_id=subentry_id, **device
+        )
+
+
 @callback
-def build_partition_device(serial: str, number: int, *, name: str = "") -> DeviceInfo:
+def build_partition_device(
+    hass: HomeAssistant, entry_id: str, serial: str, number: int, *, name: str = ""
+) -> dict[str, Any]:
     """Describe one partition as a sub-device of the panel.
 
     Named through `translation_key` rather than with a literal, so a Brazilian installation reads
@@ -111,13 +196,14 @@ def build_partition_device(serial: str, number: int, *, name: str = "") -> Devic
     a literal, and rightly: *Interno* is the installer's own word, in the installer's own language,
     and there is nothing to translate.
     """
-    device = DeviceInfo(
-        identifiers={(DOMAIN, partition_device_id(serial, number))},
-        manufacturer=MANUFACTURER,
-        # No `model`: a partition is not a product, and the field would show untranslated English
-        # under a translated name. The name says what it is.
-        via_device=(DOMAIN, panel_device_id(serial)),
-    )
+    device: dict[str, Any] = {
+        "identifiers": {(DOMAIN, partition_device_id(serial, number))},
+        **_link_to_panel(hass, entry_id, serial),
+    }
+    if not _HAS_CHILD_DEVICE_INFO:
+        # No `model` on a child device (see build_zone_device's docstring) — but a partition never
+        # had one anyway, so the pre-2026.9 path keeps the manufacturer field it always had.
+        device["manufacturer"] = MANUFACTURER
     if name:
         device["name"] = name
     else:
@@ -127,18 +213,22 @@ def build_partition_device(serial: str, number: int, *, name: str = "") -> Devic
 
 
 @callback
-def build_fence_device(serial: str) -> DeviceInfo:
+def build_fence_device(hass: HomeAssistant, entry_id: str, serial: str) -> dict[str, Any]:
     """Describe the electric fence as a sub-device of the panel."""
-    return DeviceInfo(
-        identifiers={(DOMAIN, fence_device_id(serial))},
-        manufacturer=MANUFACTURER,
-        translation_key="fence",
-        via_device=(DOMAIN, panel_device_id(serial)),
-    )
+    device: dict[str, Any] = {
+        "identifiers": {(DOMAIN, fence_device_id(serial))},
+        "translation_key": "fence",
+        **_link_to_panel(hass, entry_id, serial),
+    }
+    if not _HAS_CHILD_DEVICE_INFO:
+        device["manufacturer"] = MANUFACTURER
+    return device
 
 
 @callback
-def build_zone_device(serial: str, number: int, *, name: str = "", model: str = "") -> DeviceInfo:
+def build_zone_device(
+    hass: HomeAssistant, entry_id: str, serial: str, number: int, *, name: str = "", model: str = ""
+) -> dict[str, Any]:
     """Describe one zone as a sub-device of the panel.
 
     **A zone is a detector, and a detector is a device.** Sprint 5 promoted zones out of the panel
@@ -151,24 +241,26 @@ def build_zone_device(serial: str, number: int, *, name: str = "", model: str = 
     Writing the composed name literally is exactly the bug that put an English word on a Portuguese
     device page.
 
-    *model* names the **wireless detector** enrolled on this zone, when there is one. The family
-    is the high byte of the detector's serial (`WirelessRecord.model`), confirmed against the
-    panel's UI on 2026-08-09 — which reversed Sprint 5's note that the model was not knowable.
-    A **hard-wired** zone still gets no model and no guess: the panel reports the *state* of a
-    wired zone and never what is attached to it, so a reed switch and a magnetic contact are the
-    same nibble.
+    *model* names the **wireless detector** enrolled on this zone (the high byte of
+    `WirelessRecord.model`), when there is one; `async_apply_programmed_names` additionally writes
+    the detector's own serial as `serial_number`. **Both ignored on a 2026.9+ child device** — that
+    mechanism has neither field at all, so callers on 2026.9+ put the same two values on the signal
+    sensor's `extra_state_attributes` instead, which is the only place they show up there — see
+    `sensor.py`'s `_JflWirelessSensor`. A hard-wired zone never had either to show, either way: the
+    panel reports the *state* of a wired zone and never what is attached to it.
     """
-    device = DeviceInfo(
-        identifiers={(DOMAIN, zone_device_id(serial, number))},
-        manufacturer=MANUFACTURER,
-        translation_key="zone_named" if name else "zone",
-        translation_placeholders=(
+    device: dict[str, Any] = {
+        "identifiers": {(DOMAIN, zone_device_id(serial, number))},
+        "translation_key": "zone_named" if name else "zone",
+        "translation_placeholders": (
             {"number": str(number), "name": name} if name else {"number": str(number)}
         ),
-        via_device=(DOMAIN, panel_device_id(serial)),
-    )
-    if model:
-        device["model"] = model
+        **_link_to_panel(hass, entry_id, serial),
+    }
+    if not _HAS_CHILD_DEVICE_INFO:
+        device["manufacturer"] = MANUFACTURER
+        if model:
+            device["model"] = model
     return device
 
 
@@ -206,35 +298,33 @@ def async_apply_programmed_names(
     registration, so a zone that has existed since Sprint 2 keeps its id and only its friendly name
     changes. That is the behaviour the entity map asked for, and a test holds it.
     """
-    registry = dr.async_get(hass)
     for number, name in zones.items():
-        if (
-            registry.async_get_device(identifiers={(DOMAIN, zone_device_id(serial, number))})
-            is None
-        ):
+        if not _sub_device_exists(hass, entry_id, (DOMAIN, zone_device_id(serial, number))):
             continue
         radio = wireless.get(number)
         device = build_zone_device(
-            serial, number, name=name, model=(radio.model or "") if radio is not None else ""
+            hass,
+            entry_id,
+            serial,
+            number,
+            name=name,
+            model=(radio.model or "") if radio is not None else "",
         )
-        if radio is not None:
+        if radio is not None and not _HAS_CHILD_DEVICE_INFO:
             # A zone in the wireless enrolment table is a radio device, and that table is the only
-            # place the panel says so. The serial is the detector's own, printed on its label.
+            # place the panel says so. The serial is the detector's own, printed on its label. No
+            # `serial_number` field exists on a 2026.9+ child device — see build_zone_device.
             device["serial_number"] = f"{radio.serial:010d}"
-        registry.async_get_or_create(
-            config_entry_id=entry_id, config_subentry_id=subentry_id, **device
-        )
+        _register_sub_device(hass, entry_id=entry_id, subentry_id=subentry_id, device=device)
 
     for number, name in partitions.items():
-        if (
-            registry.async_get_device(identifiers={(DOMAIN, partition_device_id(serial, number))})
-            is None
-        ):
+        if not _sub_device_exists(hass, entry_id, (DOMAIN, partition_device_id(serial, number))):
             continue
-        registry.async_get_or_create(
-            config_entry_id=entry_id,
-            config_subentry_id=subentry_id,
-            **build_partition_device(serial, number, name=name),
+        _register_sub_device(
+            hass,
+            entry_id=entry_id,
+            subentry_id=subentry_id,
+            device=build_partition_device(hass, entry_id, serial, number, name=name),
         )
 
 

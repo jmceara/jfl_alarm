@@ -87,7 +87,9 @@ async def test_a_detected_fence_pgm_gets_no_switch(
         assert coordinator.capabilities.detected_fence_pgm == 2
         assert entities.async_get_entity_id("switch", DOMAIN, f"{panel.serial}-pgm2") is None
 
-        panel_device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, panel.serial)})
+        panel_device = dr.async_get(hass).async_get_device_by_identifier(
+            (DOMAIN, panel.serial), config_entry_id=entry.entry_id
+        )
         ordinary = entities.async_get(
             entities.async_get_entity_id("switch", DOMAIN, f"{panel.serial}-pgm1")
         )

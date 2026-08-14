@@ -2,7 +2,6 @@
   "config": {
     "step": {
       "user": {
-        "title": "JFL Alarm",
         "description": "JFL panels dial out to Home Assistant, so this integration listens and waits. Choose the TCP port to listen on; it must match the reporting destination programmed into the panel. Everything else — model, partitions, zones and the electric fence — is detected from the panel itself.",
         "data": {
           "port": "Listening port",
@@ -14,7 +13,6 @@
         }
       },
       "reconfigure": {
-        "title": "Change the listening address",
         "description": "Changing the port means reprogramming the panel to match, or it will stop reporting.",
         "data": {
           "port": "Listening port",
@@ -38,14 +36,12 @@
   },
   "config_subentries": {
     "panel": {
-      "title": "Panel",
       "initiate_flow": {
         "user": "Add a panel"
       },
       "entry_type": "Panel",
       "step": {
         "user": {
-          "title": "Add a JFL panel",
           "description": "Panels that have already reported in are listed below and need nothing else. Add one by hand only if it is not powered up yet, or if the listener is set to hold unknown panels for approval.",
           "data": {
             "serial": "Panel serial number",
@@ -67,7 +63,6 @@
           }
         },
         "reconfigure": {
-          "title": "Panel settings",
           "description": "Settings for panel {serial}. The serial number identifies the panel and cannot be changed.",
           "data": {
             "read_only": "Read-only mode",
@@ -493,6 +488,10 @@
     "fence_pgm_conflict": {
       "title": "Electric fence PGM setting disagrees with the panel",
       "description": "You set PGM {configured} as the electric fence's power for panel {serial}, but the panel's own programming says PGM {detected} drives it.\n\nYour setting is being honoured — nothing has changed. But one of the two is wrong: either the programming reads a function you did not expect, or the number in the settings is a mistake. Check which output really switches your energiser and set it accordingly."
+    },
+    "fence_pgm_detected": {
+      "title": "A PGM output powers the electric fence",
+      "description": "This issue is retired — the integration now places and marks the switch itself instead of asking you to. Kept here only so an installation upgrading from an older version can still show and dismiss the one it already raised."
     }
   },
   "device": {

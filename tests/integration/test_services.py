@@ -35,6 +35,7 @@ from homeassistant.helpers import entity_registry as er
 from pyjfl import Cmd, FrameReader, bitmap_to_flags
 
 from custom_components.jfl_alarm.const import CONF_FENCE_PGM, CONF_READ_ONLY, DOMAIN
+from custom_components.jfl_alarm.device import get_sub_device
 from tests.integration.conftest import announce_programming, make_entry
 from tests.panel_sim import FakePanel
 
@@ -83,8 +84,10 @@ async def _next_command(connection, timeout: float = 2.0):
     raise AssertionError("no command frame arrived")
 
 
-def _panel_device_id(hass: HomeAssistant, serial: str) -> str:
-    device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, serial)})
+def _panel_device_id(hass: HomeAssistant, entry_id: str, serial: str) -> str:
+    device = dr.async_get(hass).async_get_device_by_identifier(
+        (DOMAIN, serial), config_entry_id=entry_id
+    )
     assert device is not None
     return device.id
 
@@ -201,7 +204,7 @@ async def test_the_energisers_pgm_gets_no_switch_at_all(
         )
         assert ordinary.disabled_by is None
         assert ordinary.entity_category is None
-        assert ordinary.device_id == _panel_device_id(hass, panel.serial)
+        assert ordinary.device_id == _panel_device_id(hass, entry.entry_id, panel.serial)
     finally:
         await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
@@ -259,7 +262,7 @@ async def test_a_panel_with_no_fence_still_marks_an_energiser_output(
         assert marked is not None, "created: it is the only sign that the programming disagrees"
         assert marked.disabled_by is er.RegistryEntryDisabler.INTEGRATION
         assert marked.entity_category is EntityCategory.CONFIG
-        assert marked.device_id == _panel_device_id(hass, panel.serial)
+        assert marked.device_id == _panel_device_id(hass, entry.entry_id, panel.serial)
     finally:
         await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
@@ -445,7 +448,7 @@ async def test_sync_time_sends_the_clock_in_the_panels_own_order(
         await hass.services.async_call(
             DOMAIN,
             "sync_time",
-            {"device_id": _panel_device_id(hass, panel.serial)},
+            {"device_id": _panel_device_id(hass, entry.entry_id, panel.serial)},
             blocking=True,
         )
         frame = await _next_command(connection)
@@ -475,7 +478,7 @@ async def test_refresh_status_service_asks_the_panel_now(
     await hass.services.async_call(
         DOMAIN,
         "refresh_status",
-        {"device_id": _panel_device_id(hass, panel.serial)},
+        {"device_id": _panel_device_id(hass, setup_entry.entry_id, panel.serial)},
         blocking=True,
     )
     reply = await connection.read_reply()
@@ -490,7 +493,7 @@ async def test_set_bypass_mask_replaces_the_whole_list(
     entry = await _writable_entry(hass, port, panel)
     try:
         connection, _ = await _bring_up(hass, entry, connect_panel, panel)
-        device_id = _panel_device_id(hass, panel.serial)
+        device_id = _panel_device_id(hass, entry.entry_id, panel.serial)
 
         await hass.services.async_call(
             DOMAIN, "set_bypass_mask", {"device_id": device_id, "zones": [3, 4]}, blocking=True
@@ -516,9 +519,7 @@ async def test_a_service_targeting_a_partition_finds_its_panel(
     entry = await _writable_entry(hass, port, panel)
     try:
         connection, _ = await _bring_up(hass, entry, connect_panel, panel)
-        partition = dr.async_get(hass).async_get_device(
-            identifiers={(DOMAIN, f"{panel.serial}-partition1")}
-        )
+        partition = get_sub_device(hass, entry.entry_id, (DOMAIN, f"{panel.serial}-partition1"))
         assert partition is not None
 
         await hass.services.async_call(
@@ -550,7 +551,7 @@ async def test_read_only_mode_stops_the_services_too(
         await hass.services.async_call(
             DOMAIN,
             "set_bypass_mask",
-            {"device_id": _panel_device_id(hass, panel.serial), "zones": [1]},
+            {"device_id": _panel_device_id(hass, setup_entry.entry_id, panel.serial), "zones": [1]},
             blocking=True,
         )
     with pytest.raises(TimeoutError):

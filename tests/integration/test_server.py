@@ -199,7 +199,12 @@ async def test_three_models_on_one_port_produce_three_independent_devices(
 
         devices = dr.async_get(hass)
         for panel in panels:
-            assert devices.async_get_device(identifiers={(DOMAIN, panel.serial)}) is not None
+            assert (
+                devices.async_get_device_by_identifier(
+                    (DOMAIN, panel.serial), config_entry_id=entry.entry_id
+                )
+                is not None
+            )
     finally:
         await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()

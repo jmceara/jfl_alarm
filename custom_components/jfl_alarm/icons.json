@@ -44,10 +44,16 @@
       "signal": {
         "default": "mdi:signal"
       },
+      "zone_signal": {
+        "default": "mdi:signal"
+      },
       "last_connected": {
         "default": "mdi:transit-connection-variant"
       },
       "last_seen": {
+        "default": "mdi:ear-hearing"
+      },
+      "zone_last_transmission": {
         "default": "mdi:ear-hearing"
       },
       "last_event": {
@@ -94,6 +100,9 @@
     },
     "read_programming": {
       "service": "mdi:file-download-outline"
+    },
+    "read_event_buffer": {
+      "service": "mdi:history"
     }
   }
 }

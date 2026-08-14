@@ -118,7 +118,7 @@ def _discover(coordinator: JflPanelCoordinator, state: JflPanelState) -> list[En
 
 
 class JflPartitionAlarm(JflPartitionEntity, AlarmControlPanelEntity):
-    """One programmed partition, with all three of the panel's arm modes."""
+    """One programmed partition, with the two arm modes a user actually arms with."""
 
     _attr_name = None
     """The partition sub-device carries the name, so the entity inherits the device's."""

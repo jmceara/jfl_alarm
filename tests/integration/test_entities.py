@@ -40,6 +40,7 @@ from custom_components.jfl_alarm.const import (
     PGM_PLACEMENT_VERSION,
     ZONES_ALL,
 )
+from custom_components.jfl_alarm.device import build_fence_device, get_sub_device
 from tests.integration.conftest import announce_programming, make_entry, wait_until
 from tests.panel_sim import FakePanel
 
@@ -261,7 +262,9 @@ async def test_identity_is_on_the_device_and_not_in_entities(
     await _bring_up(hass, setup_entry, connect_panel, panel)
 
     devices = dr.async_get(hass)
-    device = devices.async_get_device(identifiers={(DOMAIN, panel.serial)})
+    device = devices.async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
     assert device is not None
     assert device.manufacturer == "JFL"
     assert device.model == "Active 32 Duo"
@@ -282,15 +285,20 @@ async def test_identity_is_on_the_device_and_not_in_entities(
 async def test_partitions_and_the_fence_are_sub_devices_of_the_panel(
     hass: HomeAssistant, setup_entry, connect_panel, panel: FakePanel
 ) -> None:
-    """`via_device` is what makes the device page readable on a four-partition installation."""
+    """The sub-device link is what makes the device page readable on a multi-partition install."""
     await _bring_up(hass, setup_entry, connect_panel, panel)
 
     devices = dr.async_get(hass)
-    panel_device = devices.async_get_device(identifiers={(DOMAIN, panel.serial)})
+    panel_device = devices.async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
     for suffix in ("partition1", "fence"):
-        sub = devices.async_get_device(identifiers={(DOMAIN, f"{panel.serial}-{suffix}")})
+        sub = get_sub_device(hass, setup_entry.entry_id, (DOMAIN, f"{panel.serial}-{suffix}"))
         assert sub is not None
-        assert sub.via_device_id == panel_device.id
+        # `parent_device_id` on 2026.9+ (a child device); `via_device_id` before it — whichever
+        # this Home Assistant version has must name the same panel device.
+        linked_to = getattr(sub, "parent_device_id", None) or sub.via_device_id
+        assert linked_to == panel_device.id
 
 
 async def test_an_entity_stranded_on_an_enabled_device_is_released(
@@ -308,11 +316,24 @@ async def test_an_entity_stranded_on_an_enabled_device_is_released(
     entry = make_entry(port, serials=[panel.serial])
     entry.add_to_hass(hass)
     subentry_id = next(iter(entry.subentries))
-    fence_device = dr.async_get(hass).async_get_or_create(
+    # `async_setup` has not run yet, so the panel device this stray fence has to attach to (on
+    # 2026.9+, a fence is a *child* device — see `build_fence_device`) does not exist. Registered by
+    # hand here, the same way `__init__.py` registers it before forwarding any platform.
+    registry = dr.async_get(hass)
+    registry.async_get_or_create(
         config_entry_id=entry.entry_id,
         config_subentry_id=subentry_id,
-        identifiers={(DOMAIN, f"{panel.serial}-fence")},
+        identifiers={(DOMAIN, panel.serial)},
     )
+    fence = build_fence_device(hass, entry.entry_id, panel.serial)
+    if fence.get("parent_device_id") is not None:
+        fence_device = registry.async_get_or_create_child(  # type: ignore[attr-defined]
+            config_entry_id=entry.entry_id, config_subentry_id=subentry_id, **fence
+        )
+    else:
+        fence_device = registry.async_get_or_create(
+            config_entry_id=entry.entry_id, config_subentry_id=subentry_id, **fence
+        )
     assert not fence_device.disabled, "the device is fine; only the entities are stuck"
     entities = er.async_get(hass)
     stranded = entities.async_get_or_create(
@@ -763,7 +784,9 @@ async def test_the_device_learns_the_model_the_panel_reports(
     """
     devices = dr.async_get(hass)
 
-    before = devices.async_get_device(identifiers={(DOMAIN, panel.serial)})
+    before = devices.async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
     assert before is not None
     assert before.model == "Unknown JFL panel"
     assert before.sw_version is None
@@ -771,7 +794,9 @@ async def test_the_device_learns_the_model_the_panel_reports(
     connection = await connect_panel(panel)
     await connection.introduce(hass)
 
-    after = devices.async_get_device(identifiers={(DOMAIN, panel.serial)})
+    after = devices.async_get_device_by_identifier(
+        (DOMAIN, panel.serial), config_entry_id=setup_entry.entry_id
+    )
     assert after is not None
     assert after.model == "Active 32 Duo"
     assert after.model_id == "0xA0"
@@ -798,7 +823,9 @@ async def test_firmware_that_is_not_three_digits_is_shown_as_is(
         connection = await connect_panel(panel)
         await connection.introduce(hass)
 
-        device = dr.async_get(hass).async_get_device(identifiers={(DOMAIN, panel.serial)})
+        device = dr.async_get(hass).async_get_device_by_identifier(
+            (DOMAIN, panel.serial), config_entry_id=entry.entry_id
+        )
         assert device is not None
         assert device.sw_version == "A61", "not reshaped into a version it never reported"
     finally:

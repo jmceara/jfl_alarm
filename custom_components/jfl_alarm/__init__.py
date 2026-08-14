@@ -24,6 +24,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.const import CONF_HOST, CONF_PORT, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from pyjfl import JflServer
@@ -50,6 +51,7 @@ from .const import (
     UNKNOWN_ACCEPT,
 )
 from .coordinator import JflPanelCoordinator
+from .device import build_panel_device
 from .repairs import async_watch_for_silence
 from .services import async_register_services
 
@@ -82,6 +84,10 @@ PLATFORMS: Final[list[Platform]] = [
 ]
 """Lives here rather than in `const.py` so that `const.py` needs no Home Assistant import: the test
 asserting `DEFAULT_READ_ONLY is True` has to be runnable on a machine without it."""
+
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+"""No `configuration.yaml` path exists — see the module docstring. `async_setup` below only
+registers the actions; it never reads *config*."""
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -129,6 +135,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: JflConfigEntry) -> bool:
         if subentry.subentry_type != SUBENTRY_TYPE_PANEL:
             continue
         serial = str(subentry.data[CONF_SERIAL])
+        # Registered explicitly, and before any entity, so a partition/zone/fence entity's
+        # `parent_device_id` lookup always finds the panel — building a child `DeviceInfo` no
+        # longer accepts a bare `(DOMAIN, identifier)` pair, unlike the removed `via_device`.
+        # `info=None` here is exactly the pre-connection fallback `build_panel_device` already
+        # returns; `async_refresh_panel_device` overwrites it once the panel actually dials in.
+        dr.async_get(hass).async_get_or_create(
+            config_entry_id=entry.entry_id,
+            config_subentry_id=subentry.subentry_id,
+            **build_panel_device(None, serial, subentry.title),
+        )
         coordinator = JflPanelCoordinator(
             hass,
             entry,

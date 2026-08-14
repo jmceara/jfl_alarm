@@ -14,15 +14,16 @@ fixes itself if the user reloads at the right moment.
 
 **Identity lives on the device, not in entities.** Model, firmware, serial and MAC are `DeviceInfo`
 fields — AGENTS.md §5 and `docs/development/entity-map.md`. Partitions and the fence get their own
-sub-devices linked back with `via_device`, so a dashboard can show "Ground floor" without also
-showing everything else the panel knows.
+sub-devices linked back to the panel by `parent_device_id`, so a dashboard can show "Ground floor"
+without also showing everything else the panel knows.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from homeassistant.core import callback
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import LOGGER
@@ -87,8 +88,19 @@ class JflPartitionEntity(JflEntity):
         """
         self.partition = partition
         super().__init__(coordinator, f"partition{partition}-{key}")
-        self._attr_device_info = build_partition_device(
-            coordinator.serial, partition, name=coordinator.programming.partition_name(partition)
+        # `build_partition_device` returns a plain dict, shaped as `DeviceInfo` pre-2026.9 and as
+        # `ChildDeviceInfo` from 2026.9 on — `_attr_device_info`'s declared type is the former, but
+        # Home Assistant itself only ever consumes both as a dict at the boundary in
+        # `entity_platform.py`, so the cast is exactly as safe as the runtime behavior it describes.
+        self._attr_device_info = cast(
+            "DeviceInfo",
+            build_partition_device(
+                coordinator.hass,
+                coordinator.config_entry.entry_id,
+                coordinator.serial,
+                partition,
+                name=coordinator.programming.partition_name(partition),
+            ),
         )
 
 
@@ -98,7 +110,12 @@ class JflFenceEntity(JflEntity):
     def __init__(self, coordinator: JflPanelCoordinator, key: str) -> None:
         """Bind to the fence on this panel."""
         super().__init__(coordinator, f"fence-{key}")
-        self._attr_device_info = build_fence_device(coordinator.serial)
+        self._attr_device_info = cast(
+            "DeviceInfo",
+            build_fence_device(
+                coordinator.hass, coordinator.config_entry.entry_id, coordinator.serial
+            ),
+        )
 
 
 class JflZoneEntity(JflEntity):
@@ -127,11 +144,16 @@ class JflZoneEntity(JflEntity):
         self.zone = zone
         super().__init__(coordinator, f"zone{zone}-{key}")
         radio = coordinator.programming.wireless_for_zone(zone)
-        self._attr_device_info = build_zone_device(
-            coordinator.serial,
-            zone,
-            name=coordinator.programming.zone_name(zone),
-            model=(radio.model or "") if radio is not None else "",
+        self._attr_device_info = cast(
+            "DeviceInfo",
+            build_zone_device(
+                coordinator.hass,
+                coordinator.config_entry.entry_id,
+                coordinator.serial,
+                zone,
+                name=coordinator.programming.zone_name(zone),
+                model=(radio.model or "") if radio is not None else "",
+            ),
         )
 
 
